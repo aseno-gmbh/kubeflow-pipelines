@@ -696,7 +696,7 @@ inputs:
 - {name: message, type: PipelineTaskFinalStatus}
 implementation:
   container:
-    image: python:3.7
+    image: python:3.9
     command:
     - echo
     - {inputValue: message}
@@ -908,6 +908,59 @@ implementation:
                 ('model', dsl.Model),
             ]):
                 task = print_and_return(text='Hello')
+
+
+class TestCompilePipelineCaching(unittest.TestCase):
+
+    def test_compile_pipeline_with_caching_enabled(self):
+        """Test pipeline compilation with caching enabled."""
+
+        @dsl.component
+        def my_component():
+            pass
+
+        @dsl.pipeline(name='tiny-pipeline')
+        def my_pipeline():
+            my_task = my_component()
+            my_task.set_caching_options(True)
+
+        with tempfile.TemporaryDirectory() as tempdir:
+            output_yaml = os.path.join(tempdir, 'pipeline.yaml')
+            compiler.Compiler().compile(
+                pipeline_func=my_pipeline, package_path=output_yaml)
+
+            with open(output_yaml, 'r') as f:
+                pipeline_spec = yaml.safe_load(f)
+
+            task_spec = pipeline_spec['root']['dag']['tasks']['my-component']
+            caching_options = task_spec['cachingOptions']
+
+            self.assertTrue(caching_options['enableCache'])
+
+    def test_compile_pipeline_with_caching_disabled(self):
+        """Test pipeline compilation with caching disabled."""
+
+        @dsl.component
+        def my_component():
+            pass
+
+        @dsl.pipeline(name='tiny-pipeline')
+        def my_pipeline():
+            my_task = my_component()
+            my_task.set_caching_options(False)
+
+        with tempfile.TemporaryDirectory() as tempdir:
+            output_yaml = os.path.join(tempdir, 'pipeline.yaml')
+            compiler.Compiler().compile(
+                pipeline_func=my_pipeline, package_path=output_yaml)
+
+            with open(output_yaml, 'r') as f:
+                pipeline_spec = yaml.safe_load(f)
+
+            task_spec = pipeline_spec['root']['dag']['tasks']['my-component']
+            caching_options = task_spec.get('cachingOptions', {})
+
+            self.assertEqual(caching_options, {})
 
 
 class V2NamespaceAliasTest(unittest.TestCase):
@@ -1172,7 +1225,7 @@ class TestCompileComponent(parameterized.TestCase):
         def hello_world_container() -> dsl.ContainerSpec:
             """Hello world component."""
             return dsl.ContainerSpec(
-                image='python:3.7',
+                image='python:3.9',
                 command=['echo', 'hello world'],
                 args=[],
             )
@@ -1195,7 +1248,7 @@ class TestCompileComponent(parameterized.TestCase):
         @dsl.container_component
         def container_simple_io(text: str, output_path: dsl.OutputPath(str)):
             return dsl.ContainerSpec(
-                image='python:3.7',
+                image='python:3.9',
                 command=['my_program', text],
                 args=['--output_path', output_path])
 
@@ -2243,7 +2296,7 @@ class TestYamlComments(unittest.TestCase):
         def my_container_component(text: str, output_path: OutputPath(str)):
             """component description."""
             return ContainerSpec(
-                image='python:3.7',
+                image='python:3.9',
                 command=['my_program', text],
                 args=['--output_path', output_path])
 
@@ -3382,31 +3435,31 @@ class TestResourceConfig(unittest.TestCase):
             ['exec-return-1']['container'])
 
         self.assertEqual(
-            5, dict_format['deploymentSpec']['executors']['exec-return-1-2']
-            ['container']['resources']['cpuLimit'])
+            '5', dict_format['deploymentSpec']['executors']['exec-return-1-2']
+            ['container']['resources']['resourceCpuLimit'])
         self.assertNotIn(
             'memoryLimit', dict_format['deploymentSpec']['executors']
             ['exec-return-1-2']['container']['resources'])
 
         self.assertEqual(
-            50, dict_format['deploymentSpec']['executors']['exec-return-1-3']
-            ['container']['resources']['memoryLimit'])
+            '50G', dict_format['deploymentSpec']['executors']['exec-return-1-3']
+            ['container']['resources']['resourceMemoryLimit'])
         self.assertNotIn(
             'cpuLimit', dict_format['deploymentSpec']['executors']
             ['exec-return-1-3']['container']['resources'])
 
         self.assertEqual(
-            2, dict_format['deploymentSpec']['executors']['exec-return-1-4']
-            ['container']['resources']['cpuRequest'])
+            '2', dict_format['deploymentSpec']['executors']['exec-return-1-4']
+            ['container']['resources']['resourceCpuRequest'])
         self.assertEqual(
-            5, dict_format['deploymentSpec']['executors']['exec-return-1-4']
-            ['container']['resources']['cpuLimit'])
+            '5', dict_format['deploymentSpec']['executors']['exec-return-1-4']
+            ['container']['resources']['resourceCpuLimit'])
         self.assertEqual(
-            4, dict_format['deploymentSpec']['executors']['exec-return-1-4']
-            ['container']['resources']['memoryRequest'])
+            '4G', dict_format['deploymentSpec']['executors']['exec-return-1-4']
+            ['container']['resources']['resourceMemoryRequest'])
         self.assertEqual(
-            50, dict_format['deploymentSpec']['executors']['exec-return-1-4']
-            ['container']['resources']['memoryLimit'])
+            '50G', dict_format['deploymentSpec']['executors']['exec-return-1-4']
+            ['container']['resources']['resourceMemoryLimit'])
 
 
 class TestPlatformConfig(unittest.TestCase):
@@ -4445,7 +4498,7 @@ class TestConditionLogic(unittest.TestCase):
             self):
         with self.assertRaisesRegex(
                 tasks_group.InvalidControlFlowException,
-                'dsl\.Else can only be used following an upstream dsl\.If or dsl\.Elif\.'
+                r'dsl\.Else can only be used following an upstream dsl\.If or dsl\.Elif\.'
         ):
 
             @dsl.pipeline
@@ -4908,7 +4961,7 @@ class TestDslOneOf(unittest.TestCase):
     def test_nested_under_condition_returned_raises(self):
         with self.assertRaisesRegex(
                 compiler_utils.InvalidTopologyException,
-                f'Pipeline outputs may only be returned from the top level of the pipeline function scope\. Got pipeline output dsl\.OneOf from within the control flow group dsl\.If\.'
+                r'Pipeline outputs may only be returned from the top level of the pipeline function scope\. Got pipeline output dsl\.OneOf from within the control flow group dsl\.If\.'
         ):
 
             @dsl.pipeline
@@ -4961,7 +5014,7 @@ class TestDslOneOf(unittest.TestCase):
 
         with self.assertRaisesRegex(
                 compiler_utils.InvalidTopologyException,
-                f'Pipeline outputs may only be returned from the top level of the pipeline function scope\. Got pipeline output dsl\.OneOf from within the control flow group dsl\.ParallelFor\.'
+                r'Pipeline outputs may only be returned from the top level of the pipeline function scope\. Got pipeline output dsl\.OneOf from within the control flow group dsl\.ParallelFor\.'
         ):
 
             @dsl.pipeline
@@ -4983,7 +5036,7 @@ class TestDslOneOf(unittest.TestCase):
 
         with self.assertRaisesRegex(
                 compiler_utils.InvalidTopologyException,
-                f'Illegal task dependency across DSL context managers\. A downstream task cannot depend on an upstream task within a dsl\.If context unless the downstream is within that context too\. Found task print-artifact which depends on upstream task condition-branches-5 within an uncommon dsl\.If context\.'
+                r'Illegal task dependency across DSL context managers\. A downstream task cannot depend on an upstream task within a dsl\.If context unless the downstream is within that context too\. Found task print-artifact which depends on upstream task condition-branches-5 within an uncommon dsl\.If context\.'
         ):
 
             @dsl.pipeline
@@ -5006,7 +5059,7 @@ class TestDslOneOf(unittest.TestCase):
     def test_return_at_wrong_level(self):
         with self.assertRaisesRegex(
                 compiler_utils.InvalidTopologyException,
-                f'Pipeline outputs may only be returned from the top level of the pipeline function scope\. Got pipeline output dsl\.OneOf from within the control flow group dsl\.If\.'
+                r'Pipeline outputs may only be returned from the top level of the pipeline function scope\. Got pipeline output dsl\.OneOf from within the control flow group dsl\.If\.'
         ):
 
             @dsl.pipeline
@@ -5143,7 +5196,7 @@ class TestDslOneOf(unittest.TestCase):
     def test_oneof_in_fstring(self):
         with self.assertRaisesRegex(
                 NotImplementedError,
-                f'dsl\.OneOf does not support string interpolation\.'):
+                r'dsl\.OneOf does not support string interpolation\.'):
 
             @dsl.pipeline
             def roll_die_pipeline():

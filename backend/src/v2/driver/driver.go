@@ -272,7 +272,7 @@ func Container(ctx context.Context, opts Options, mlmd *metadata.Client, cacheCl
 		execution.Condition = &willTrigger
 	}
 	if execution.WillTrigger() {
-		executorInput.Outputs = provisionOutputs(pipeline.GetPipelineRoot(), opts.Task.GetTaskInfo().GetName(), opts.Component.GetOutputDefinitions())
+		executorInput.Outputs = provisionOutputs(pipeline.GetPipelineRoot(), opts.Task.GetTaskInfo().GetName(), opts.Component.GetOutputDefinitions(), uuid.NewString())
 	}
 
 	ecfg, err := metadata.GenerateExecutionConfig(executorInput)
@@ -387,9 +387,6 @@ func initPodSpecPatch(
 	userCmdArgs = append(userCmdArgs, container.Command...)
 	userCmdArgs = append(userCmdArgs, container.Args...)
 	launcherCmd := []string{
-		// TODO(Bobgy): workaround argo emissary executor bug, after we upgrade to an argo version with the bug fix, we can remove the following line.
-		// Reference: https://github.com/argoproj/argo-workflows/issues/7406
-		"/var/run/argo/argoexec", "emissary", "--",
 		component.KFPLauncherPath,
 		// TODO(Bobgy): no need to pass pipeline_name and run_id, these info can be fetched via pipeline context and pipeline run context which have been created by root DAG driver.
 		"--pipeline_name", pipelineName,
@@ -665,6 +662,33 @@ func extendPodSpecPatch(
 		podSpec.Volumes = append(podSpec.Volumes, ephemeralVolume)
 		podSpec.Containers[0].VolumeMounts = append(podSpec.Containers[0].VolumeMounts, ephemeralVolumeMount)
 	}
+
+	// EmptyDirMounts
+	for _, emptyDirVolumeSpec := range kubernetesExecutorConfig.GetEmptyDirMounts() {
+		var sizeLimitResource *k8sres.Quantity
+		if emptyDirVolumeSpec.GetSizeLimit() != "" {
+			r := k8sres.MustParse(emptyDirVolumeSpec.GetSizeLimit())
+			sizeLimitResource = &r
+		}
+
+		emptyDirVolume := k8score.Volume{
+			Name: emptyDirVolumeSpec.GetVolumeName(),
+			VolumeSource: k8score.VolumeSource{
+				EmptyDir: &k8score.EmptyDirVolumeSource{
+					Medium:    k8score.StorageMedium(emptyDirVolumeSpec.GetMedium()),
+					SizeLimit: sizeLimitResource,
+				},
+			},
+		}
+		emptyDirVolumeMount := k8score.VolumeMount{
+			Name:      emptyDirVolumeSpec.GetVolumeName(),
+			MountPath: emptyDirVolumeSpec.GetMountPath(),
+		}
+
+		podSpec.Volumes = append(podSpec.Volumes, emptyDirVolume)
+		podSpec.Containers[0].VolumeMounts = append(podSpec.Containers[0].VolumeMounts, emptyDirVolumeMount)
+	}
+
 	return nil
 }
 
@@ -1203,7 +1227,7 @@ func resolveInputs(ctx context.Context, dag *metadata.DAG, iterationIndex *int, 
 	return inputs, nil
 }
 
-func provisionOutputs(pipelineRoot, taskName string, outputsSpec *pipelinespec.ComponentOutputsSpec) *pipelinespec.ExecutorInput_Outputs {
+func provisionOutputs(pipelineRoot, taskName string, outputsSpec *pipelinespec.ComponentOutputsSpec, outputUriSalt string) *pipelinespec.ExecutorInput_Outputs {
 	outputs := &pipelinespec.ExecutorInput_Outputs{
 		Artifacts:  make(map[string]*pipelinespec.ArtifactList),
 		Parameters: make(map[string]*pipelinespec.ExecutorInput_OutputParameter),
@@ -1215,7 +1239,7 @@ func provisionOutputs(pipelineRoot, taskName string, outputsSpec *pipelinespec.C
 				{
 					// Do not preserve the query string for output artifacts, as otherwise
 					// they'd appear in file and artifact names.
-					Uri:      metadata.GenerateOutputURI(pipelineRoot, []string{taskName, name}, false),
+					Uri:      metadata.GenerateOutputURI(pipelineRoot, []string{taskName, outputUriSalt, name}, false),
 					Type:     artifact.GetArtifactType(),
 					Metadata: artifact.GetMetadata(),
 				},

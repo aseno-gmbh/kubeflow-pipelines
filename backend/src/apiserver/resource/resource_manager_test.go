@@ -389,24 +389,6 @@ func TestCreatePipeline(t *testing.T) {
 			model:    createPipeline("complex", "", "user1"),
 		},
 		{
-			msg:            "BadObjectStore",
-			badObjectStore: true,
-			template:       testWorkflow.ToStringForStore(),
-			errorCode:      codes.Internal,
-			errorMsg:       "bad object store",
-			model:          createPipeline("BadOS", "", "user1"),
-			// We previously verified that the failed pipeline version
-			// in DB is in status PipelineVersionCreating by faking
-			// the UUID generator, so that we know the created version
-			// UUID in advance.
-			// We cannot verify it using public APIs,
-			// because the API does not expose them unless we know its UUID, but we
-			// cannot know its UUID when create version request failed.
-			// TODO: do we really need to verify this status? or should
-			// the create version request return a UUID when the
-			// pipeline version fails in PipelineVersionCreating state.
-		},
-		{
 			msg:       "InvalidTemplate",
 			template:  "I am invalid yaml",
 			model:     createPipeline("InvalidYAML", "", "user1"),
@@ -535,23 +517,6 @@ func TestCreatePipelineVersion(t *testing.T) {
 				Parameters:   "[{\"name\":\"output\"},{\"name\":\"project\"},{\"name\":\"schema\",\"value\":\"gs://ml-pipeline-playground/tfma/taxi-cab-classification/schema.json\"},{\"name\":\"train\",\"value\":\"gs://ml-pipeline-playground/tfma/taxi-cab-classification/train.csv\"},{\"name\":\"evaluation\",\"value\":\"gs://ml-pipeline-playground/tfma/taxi-cab-classification/eval.csv\"},{\"name\":\"preprocess-mode\",\"value\":\"local\"},{\"name\":\"preprocess-module\",\"value\":\"gs://ml-pipeline-playground/tfma/taxi-cab-classification/preprocessing.py\"},{\"name\":\"target\",\"value\":\"tips\"},{\"name\":\"learning-rate\",\"value\":\"0.1\"},{\"name\":\"hidden-layer-size\",\"value\":\"1500\"},{\"name\":\"steps\",\"value\":\"3000\"},{\"name\":\"workers\",\"value\":\"0\"},{\"name\":\"pss\",\"value\":\"0\"},{\"name\":\"predict-mode\",\"value\":\"local\"},{\"name\":\"analyze-mode\",\"value\":\"local\"},{\"name\":\"analyze-slice-column\",\"value\":\"trip_start_hour\"}]",
 				PipelineSpec: complexPipeline,
 			},
-		},
-		{
-			msg:            "BadObjectStore",
-			badObjectStore: true,
-			template:       testWorkflow.ToStringForStore(),
-			errorCode:      codes.Internal,
-			errorMsg:       "bad object store",
-			// We previously verified that the failed pipeline version
-			// in DB is in status PipelineVersionCreating by faking
-			// the UUID generator, so that we know the created version
-			// UUID in advance.
-			// We cannot verify it using public APIs,
-			// because the API does not expose them unless we know its UUID, but we
-			// cannot know its UUID when create version request failed.
-			// TODO: do we really need to verify this status? or should
-			// the create version request return a UUID when the
-			// pipeline version fails in PipelineVersionCreating state.
 		},
 		{
 			msg:       "InvalidTemplate",
@@ -1530,12 +1495,12 @@ func TestDeletePipelineVersion_FileError(t *testing.T) {
 
 	// Delete the above pipeline_version.
 	err = manager.DeletePipelineVersion(FakeUUIDOne)
-	assert.NotNil(t, err)
+	assert.Nil(t, err)
 
 	// Verify the version in deleting status.
 	version, err := manager.pipelineStore.GetPipelineVersionWithStatus(FakeUUIDOne, model.PipelineVersionDeleting)
-	assert.Nil(t, err)
-	assert.NotNil(t, version)
+	assert.NotNil(t, err)
+	assert.Nil(t, version)
 }
 
 // Tests DeletePipeline
@@ -3512,7 +3477,7 @@ spec:
       - name: ENABLE_CACHING
         valueFrom:
           fieldRef: {fieldPath: 'metadata.labels[''pipelines.kubeflow.org/enable_caching'']'}
-      - {name: KFP_V2_IMAGE, value: 'python:3.7'}
+      - {name: KFP_V2_IMAGE, value: 'python:3.9'}
       - {name: KFP_V2_RUNTIME_INFO, value: '{"inputParameters": {"num_steps": {"type":
           "INT"}}, "inputArtifacts": {"dataset": {"metadataPath": "/tmp/inputs/dataset/data",
           "schemaTitle": "system.Dataset", "instanceSchema": ""}}, "outputParameters":
@@ -3520,7 +3485,7 @@ spec:
           "", "metadataPath": "/tmp/outputs/model/data"}}}'}
       envFrom:
       - configMapRef: {name: metadata-grpc-configmap, optional: true}
-      image: python:3.7
+      image: python:3.9
       volumeMounts:
       - {mountPath: /kfp-launcher, name: kfp-launcher}
     inputs:
@@ -4044,7 +4009,7 @@ deploymentSpec:
           _parsed_args = vars(_parser.parse_args())
 
           _outputs = hello_world(**_parsed_args)
-        image: python:3.7
+        image: python:3.9
 pipelineInfo:
   name: hello-world
 root:
@@ -4077,7 +4042,7 @@ deploymentSpec:
   executors:
     exec-hello-world:
       container:
-        image: python:3.7
+        image: python:3.9
 pipelineInfo:
   name: pipelines/p1/versions/v1
 root:

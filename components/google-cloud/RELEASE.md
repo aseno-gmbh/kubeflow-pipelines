@@ -1,8 +1,32 @@
 ## Upcoming release
+* Remove default prediction column names in `v1.model_evaluation.regression_component` component to fix pipeline errors when using bigquery data source.
+
+## Release 2.17.0
+* Fix Gemini batch prediction support to `v1.model_evaluation.autosxs_pipeline` after output schema change.
+* Modify the code to support latest bp result format
+* Update the StarryNet package metadata.
+* Use instance.target_field_name format for text-bison models only, use target_field_name for gemini models.
+* Pass model name to eval_runner to process batch prediction's output as per the output schema of model used.
+* Use LLM Model Evaluation image version v0.7
+* Update AutoSxS and RLHF image tags
+
+## Release 2.16.1
+* Fix to model batch explanation component for Structured Data pipelines; image bump.
+* Add dynamic support for boot_disk_type, boot_disk_size in `preview.custom_job.utils.create_custom_training_job_from_component`.
+* Remove preflight validations temporarily.
+* Apply latest GCPC image vulnerability resolutions (base OS and software updates).
+
+## Release 2.16.0
 * Updated the Starry Net pipeline's template gallery description, and added dataprep_nan_threshold and dataprep_zero_threshold args to the Starry Net pipeline.
 * Fix bug in Starry Net's upload decomposition plot step due to protobuf upgrade, by pinning protobuf library to 3.20.*.
+* Bump Starry Net image tags.
+* In the Starry-Net pipeline, enforce that TF Record generation always runs before test set generation to speed up pipelines runs.
 * Add support for running tasks on a `PersistentResource` (see [CustomJobSpec](https://cloud.google.com/vertex-ai/docs/reference/rest/v1beta1/CustomJobSpec)) via `persistent_resource_id` parameter on `v1.custom_job.CustomTrainingJobOp` and `v1.custom_job.create_custom_training_job_from_component`
 * Bump image for Structured Data pipelines.
+* Add check that component in preview.custom_job.utils.create_custom_training_job_from_component doesn't have any parameters that share names with any custom job fields
+* Add dynamic machine spec support for `preview.custom_job.utils.create_custom_training_job_from_component`.
+* Add preflight validations for LLM text generation pipeline.
+* Apply latest GCPC image vulnerability resolutions (base OS and software updates).
 
 ## Release 2.15.0
 * Add Gemini batch prediction support to `v1.model_evaluation.autosxs_pipeline`.
